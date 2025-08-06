@@ -1,2 +1,1 @@
-# FashOJ-judge
-none
+# FashOJ's Judger
