@@ -19,10 +19,10 @@ int apply_cgroup_limit(const char *name,
 
     /* 1. 创建 cgroup 目录 */
     snprintf(path, sizeof(path), "/sys/fs/cgroup/%s", name);
-    // if (mkdir(path, 0755) && errno != EEXIST) {
-    //     perror("mkdir cgroup");
-    //     return -1;
-    // }
+    if (mkdir(path, 0755) && errno != EEXIST) {
+        perror("mkdir cgroup");
+        return -1;
+    }
 
     /* 2. 把当前进程 PID 放进去 */
     snprintf(path, sizeof(path), "/sys/fs/cgroup/%s/cgroup.procs", name);
@@ -49,4 +49,11 @@ int apply_cgroup_limit(const char *name,
     close(fd);
 
     return 0;
+}
+void cleanup_cgroup(const char *name)
+{
+    char path[256];
+    snprintf(path, sizeof(path), "/sys/fs/cgroup/%s", name);
+    /* 空目录才能 rmdir；忽略失败 */
+    rmdir(path);
 }
