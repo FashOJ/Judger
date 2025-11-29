@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package judger;
+
+option go_package = "github.com/FashOJ/Judger/api/proto/judger";
+
+// 判题服务
+service JudgeService {
+  // 提交判题任务
+  rpc Judge (JudgeRequest) returns (JudgeResponse);
+}
+
+message JudgeRequest {
+  string id = 1;
+  string source_code = 2;
+  string language = 3; // "cpp", "go", etc.
+  int64 time_limit = 4; // ms
+  int64 memory_limit = 5; // MB
+  string work_dir = 6; // 工作目录，如果不传则自动生成
+  repeated TestCase test_cases = 7;
+}
+
+message TestCase {
+  string id = 1;
+  string input = 2; // 输入内容或文件路径
+  string expected_output = 3; // 预期输出内容或文件路径
+}
+
+message JudgeResponse {
+  string status = 1; // "Accepted", "Wrong Answer", etc.
+  string message = 2;
+  int64 time_used = 3; // ms
+  int64 memory_used = 4; // KB
+  repeated CaseResult case_results = 5;
+}
+
+message CaseResult {
+  string case_id = 1;
+  string status = 2;
+  int64 time_used = 3;
+  int64 memory_used = 4;
+  string message = 5;
+}
