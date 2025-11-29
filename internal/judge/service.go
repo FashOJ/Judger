@@ -16,8 +16,10 @@ type JudgeService struct {
 }
 
 func NewJudgeService() *JudgeService {
+	// 优先尝试使用 SandboxRunner，这通常需要 root 权限
+	// 实际生产中可以通过配置决定
 	return &JudgeService{
-		runner: runner.NewLocalRunner(),
+		runner: runner.NewSandboxRunner(),
 	}
 }
 
