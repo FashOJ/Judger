@@ -64,14 +64,45 @@ func (c *CgroupManager) AddProcess(pid int) error {
 
 // GetMemoryUsage 获取当前内存使用量
 func (c *CgroupManager) GetMemoryUsage() (int64, error) {
-	usagePath := filepath.Join(c.RootPath, "memory.current")
+	// 尝试读取 peak memory (memory.peak)，这比 current 更准确
+	usagePath := filepath.Join(c.RootPath, "memory.peak")
 	content, err := os.ReadFile(usagePath)
 	if err != nil {
-		return 0, err
+		// Fallback to current if peak is not available (some older kernels)
+		usagePath = filepath.Join(c.RootPath, "memory.current")
+		content, err = os.ReadFile(usagePath)
+		if err != nil {
+			return 0, err
+		}
 	}
 	var usage int64
 	fmt.Sscanf(strings.TrimSpace(string(content)), "%d", &usage)
 	return usage, nil
+}
+
+// GetCPUUsage 获取 CPU 使用时间 (微秒)
+func (c *CgroupManager) GetCPUUsage() (int64, error) {
+	// 读取 cpu.stat
+	// usage_usec 12345
+	statPath := filepath.Join(c.RootPath, "cpu.stat")
+	content, err := os.ReadFile(statPath)
+	if err != nil {
+		return 0, err
+	}
+	
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "usage_usec") {
+			var usage int64
+			_, err := fmt.Sscanf(line, "usage_usec %d", &usage)
+			if err != nil {
+				return 0, err
+			}
+			// 转换为毫秒
+			return usage / 1000, nil
+		}
+	}
+	return 0, fmt.Errorf("usage_usec not found in cpu.stat")
 }
 
 // Destroy 清理 cgroup

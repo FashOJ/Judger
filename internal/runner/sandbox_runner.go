@@ -80,6 +80,7 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	var status model.JudgeStatus = model.StatusAccepted
 	var timeUsed int64
 	var memoryUsed int64
+	var runErr error // 用于捕获 <-done 的错误
 
 	timeoutDuration := time.Duration(timeLimit) * time.Millisecond
 	select {
@@ -90,36 +91,49 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 		_ = cmd.Process.Kill()
 		status = model.StatusTimeLimitExceeded
 		timeUsed = timeLimit
-	case err := <-done:
-		timeUsed = time.Since(startTime).Milliseconds()
+	case runErr = <-done:
+		// 正常结束
+	}
 
-		if err != nil {
-			// 检查退出码和信号
-			if exitError, ok := err.(*exec.ExitError); ok {
-				ws := exitError.Sys().(syscall.WaitStatus)
+	// 获取 CPU 使用 (从 cgroup)
+	if cpuTime, err := cgroup.GetCPUUsage(); err == nil {
+		// 如果 cgroup 能获取到准确的 CPU 时间，则优先使用
+		timeUsed = cpuTime
+	} else {
+		// 否则使用 wall time
+		// 注意：如果是超时被 kill，这里的 wall time 可能不准确，timeUsed 已经在上面赋值为 limit
+		if status != model.StatusTimeLimitExceeded {
+			timeUsed = time.Since(startTime).Milliseconds()
+		}
+	}
 
-				// 1. 检查是否被信号杀死
-				if ws.Signaled() {
-					sig := ws.Signal()
-					switch sig {
-					case syscall.SIGKILL:
-						// 可能是 OOM，也可能是 TLE (但在 time.After 分支处理 TLE)
-						// 结合内存使用判断 MLE
-						status = model.StatusRuntimeError // 暂定，下面会修正
-					case syscall.SIGXFSZ:
-						status = model.StatusOutputLimitExceeded
-					case syscall.SIGSEGV:
-						status = model.StatusRuntimeError // Segmentation Fault
-					default:
-						status = model.StatusRuntimeError
-					}
-				} else {
-					// 非 0 退出码
+	// 检查运行错误 (仅当非超时状态时)
+	if status == model.StatusAccepted && runErr != nil {
+		// 检查退出码和信号
+		if exitError, ok := runErr.(*exec.ExitError); ok {
+			ws := exitError.Sys().(syscall.WaitStatus)
+
+			// 1. 检查是否被信号杀死
+			if ws.Signaled() {
+				sig := ws.Signal()
+				switch sig {
+				case syscall.SIGKILL:
+					// 可能是 OOM，也可能是 TLE (但在 time.After 分支处理 TLE)
+					// 结合内存使用判断 MLE
+					status = model.StatusRuntimeError // 暂定，下面会修正
+				case syscall.SIGXFSZ:
+					status = model.StatusOutputLimitExceeded
+				case syscall.SIGSEGV:
+					status = model.StatusRuntimeError // Segmentation Fault
+				default:
 					status = model.StatusRuntimeError
 				}
 			} else {
+				// 非 0 退出码
 				status = model.StatusRuntimeError
 			}
+		} else {
+			status = model.StatusRuntimeError
 		}
 	}
 

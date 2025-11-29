@@ -38,7 +38,7 @@ func (s *JudgeService) Judge(ctx context.Context, task *model.JudgeTask) *model.
 	}
 
 	// 2. 编译
-	exePath, compileLog, err := comp.Compile(task.SourceCode, task.WorkDir)
+	exePath, compileLog, err := comp.Compile(ctx, task.SourceCode, task.WorkDir)
 	result.CompileLog = compileLog
 	if err != nil {
 		result.Status = model.StatusCompileError
