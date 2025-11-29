@@ -180,6 +180,7 @@ type JudgeResponse struct {
 	TimeUsed      int64                  `protobuf:"varint,3,opt,name=time_used,json=timeUsed,proto3" json:"time_used,omitempty"`       // ms
 	MemoryUsed    int64                  `protobuf:"varint,4,opt,name=memory_used,json=memoryUsed,proto3" json:"memory_used,omitempty"` // KB
 	CaseResults   []*CaseResult          `protobuf:"bytes,5,rep,name=case_results,json=caseResults,proto3" json:"case_results,omitempty"`
+	CompileLog    string                 `protobuf:"bytes,6,opt,name=compile_log,json=compileLog,proto3" json:"compile_log,omitempty"` // 编译日志
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -249,15 +250,25 @@ func (x *JudgeResponse) GetCaseResults() []*CaseResult {
 	return nil
 }
 
+func (x *JudgeResponse) GetCompileLog() string {
+	if x != nil {
+		return x.CompileLog
+	}
+	return ""
+}
+
 type CaseResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CaseId        string                 `protobuf:"bytes,1,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	TimeUsed      int64                  `protobuf:"varint,3,opt,name=time_used,json=timeUsed,proto3" json:"time_used,omitempty"`
-	MemoryUsed    int64                  `protobuf:"varint,4,opt,name=memory_used,json=memoryUsed,proto3" json:"memory_used,omitempty"`
-	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CaseId         string                 `protobuf:"bytes,1,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
+	Status         string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	TimeUsed       int64                  `protobuf:"varint,3,opt,name=time_used,json=timeUsed,proto3" json:"time_used,omitempty"`
+	MemoryUsed     int64                  `protobuf:"varint,4,opt,name=memory_used,json=memoryUsed,proto3" json:"memory_used,omitempty"`
+	Message        string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	Input          string                 `protobuf:"bytes,6,opt,name=input,proto3" json:"input,omitempty"`
+	Output         string                 `protobuf:"bytes,7,opt,name=output,proto3" json:"output,omitempty"`
+	ExpectedOutput string                 `protobuf:"bytes,8,opt,name=expected_output,json=expectedOutput,proto3" json:"expected_output,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CaseResult) Reset() {
@@ -325,6 +336,27 @@ func (x *CaseResult) GetMessage() string {
 	return ""
 }
 
+func (x *CaseResult) GetInput() string {
+	if x != nil {
+		return x.Input
+	}
+	return ""
+}
+
+func (x *CaseResult) GetOutput() string {
+	if x != nil {
+		return x.Output
+	}
+	return ""
+}
+
+func (x *CaseResult) GetExpectedOutput() string {
+	if x != nil {
+		return x.ExpectedOutput
+	}
+	return ""
+}
+
 var File_api_proto_judger_proto protoreflect.FileDescriptor
 
 const file_api_proto_judger_proto_rawDesc = "" +
@@ -344,14 +376,16 @@ const file_api_proto_judger_proto_rawDesc = "" +
 	"\bTestCase\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05input\x18\x02 \x01(\tR\x05input\x12'\n" +
-	"\x0fexpected_output\x18\x03 \x01(\tR\x0eexpectedOutput\"\xb6\x01\n" +
+	"\x0fexpected_output\x18\x03 \x01(\tR\x0eexpectedOutput\"\xd7\x01\n" +
 	"\rJudgeResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1b\n" +
 	"\ttime_used\x18\x03 \x01(\x03R\btimeUsed\x12\x1f\n" +
 	"\vmemory_used\x18\x04 \x01(\x03R\n" +
 	"memoryUsed\x125\n" +
-	"\fcase_results\x18\x05 \x03(\v2\x12.judger.CaseResultR\vcaseResults\"\x95\x01\n" +
+	"\fcase_results\x18\x05 \x03(\v2\x12.judger.CaseResultR\vcaseResults\x12\x1f\n" +
+	"\vcompile_log\x18\x06 \x01(\tR\n" +
+	"compileLog\"\xec\x01\n" +
 	"\n" +
 	"CaseResult\x12\x17\n" +
 	"\acase_id\x18\x01 \x01(\tR\x06caseId\x12\x16\n" +
@@ -359,7 +393,10 @@ const file_api_proto_judger_proto_rawDesc = "" +
 	"\ttime_used\x18\x03 \x01(\x03R\btimeUsed\x12\x1f\n" +
 	"\vmemory_used\x18\x04 \x01(\x03R\n" +
 	"memoryUsed\x12\x18\n" +
-	"\amessage\x18\x05 \x01(\tR\amessage2D\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\x12\x14\n" +
+	"\x05input\x18\x06 \x01(\tR\x05input\x12\x16\n" +
+	"\x06output\x18\a \x01(\tR\x06output\x12'\n" +
+	"\x0fexpected_output\x18\b \x01(\tR\x0eexpectedOutput2D\n" +
 	"\fJudgeService\x124\n" +
 	"\x05Judge\x12\x14.judger.JudgeRequest\x1a\x15.judger.JudgeResponseB+Z)github.com/FashOJ/Judger/api/proto/judgerb\x06proto3"
 

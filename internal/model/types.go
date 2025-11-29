@@ -51,14 +51,18 @@ type JudgeResult struct {
 	Message     string
 	TimeUsed    int64 // ms
 	MemoryUsed  int64 // KB
+	CompileLog  string
 	CaseResults []CaseResult
 }
 
 // CaseResult 单个测试点的结果
 type CaseResult struct {
-	CaseID     string
-	Status     JudgeStatus
-	TimeUsed   int64 // ms
-	MemoryUsed int64 // KB
-	Message    string
+	CaseID      string
+	Status      JudgeStatus
+	TimeUsed    int64 // ms
+	MemoryUsed  int64 // KB
+	Message     string
+	Input       string
+	Output      string
+	ExpectedOut string
 }

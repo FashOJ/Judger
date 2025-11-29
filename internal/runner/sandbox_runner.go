@@ -28,7 +28,7 @@ func NewSandboxRunner() *SandboxRunner {
 	}
 }
 
-func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, timeLimit int64, memoryLimit int64) (string, model.JudgeStatus, int64, int64, error) {
+func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, timeLimit int64, memoryLimit int64) (string, string, model.JudgeStatus, int64, int64, error) {
 	// 1. 准备临时文件用于 IO 重定向
 	tmpDir := filepath.Dir(exePath)
 	inputFile := filepath.Join(tmpDir, "input.temp")
@@ -36,14 +36,14 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	errorFile := filepath.Join(tmpDir, "error.temp")
 
 	if err := os.WriteFile(inputFile, []byte(input), 0644); err != nil {
-		return "", model.StatusSystemError, 0, 0, fmt.Errorf("write input failed: %v", err)
+		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("write input failed: %v", err)
 	}
 
 	// 2. 创建 Cgroup
 	cgName := fmt.Sprintf("%s_%d", r.CgroupRoot, time.Now().UnixNano())
 	cgroup, err := sandbox.NewCgroupManager(cgName)
 	if err != nil {
-		return "", model.StatusSystemError, 0, 0, fmt.Errorf("create cgroup failed: %v (try running as root)", err)
+		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("create cgroup failed: %v (try running as root)", err)
 	}
 	defer cgroup.Destroy()
 
@@ -56,19 +56,19 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	// 3. 准备沙箱命令
 	cmd, err := sandbox.RunInSandbox(exePath, []string{}, "", inputFile, outputFile, errorFile)
 	if err != nil {
-		return "", model.StatusSystemError, 0, 0, fmt.Errorf("prepare sandbox failed: %v", err)
+		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("prepare sandbox failed: %v", err)
 	}
 
 	// 4. 启动进程
 	startTime := time.Now()
 	if err := cmd.Start(); err != nil {
-		return "", model.StatusRuntimeError, 0, 0, fmt.Errorf("start process failed: %v", err)
+		return "", "", model.StatusRuntimeError, 0, 0, fmt.Errorf("start process failed: %v", err)
 	}
 
 	// 将进程加入 Cgroup
 	if err := cgroup.AddProcess(cmd.Process.Pid); err != nil {
 		_ = cmd.Process.Kill()
-		return "", model.StatusSystemError, 0, 0, fmt.Errorf("add process to cgroup failed: %v", err)
+		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("add process to cgroup failed: %v", err)
 	}
 
 	// 5. 等待结束或超时
@@ -153,10 +153,13 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 		outputBytes = outputBytes[:MaxOutputSize]
 	}
 
+	// 读取 stderr
+	errorBytes, _ := os.ReadFile(errorFile)
+
 	// 清理临时文件
 	_ = os.Remove(inputFile)
 	_ = os.Remove(outputFile)
 	_ = os.Remove(errorFile)
 
-	return string(outputBytes), status, timeUsed, memoryUsed, nil
+	return string(outputBytes), string(errorBytes), status, timeUsed, memoryUsed, nil
 }

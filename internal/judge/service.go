@@ -38,7 +38,8 @@ func (s *JudgeService) Judge(ctx context.Context, task *model.JudgeTask) *model.
 	}
 
 	// 2. 编译
-	exePath, err := comp.Compile(task.SourceCode, task.WorkDir)
+	exePath, compileLog, err := comp.Compile(task.SourceCode, task.WorkDir)
+	result.CompileLog = compileLog
 	if err != nil {
 		result.Status = model.StatusCompileError
 		result.Message = err.Error()
@@ -85,60 +86,71 @@ func (s *JudgeService) runTestCase(ctx context.Context, exePath string, task *mo
 	}
 
 	// 运行
-	output, status, timeUsed, memUsed, err := s.runner.Run(ctx, exePath, inputContent, task.TimeLimit, task.MemoryLimit)
+	output, stderr, status, timeUsed, memUsed, err := s.runner.Run(ctx, exePath, inputContent, task.TimeLimit, task.MemoryLimit)
+
+	// 构造基础 CaseResult
+	caseRes := model.CaseResult{
+		CaseID:     tc.ID,
+		Status:     status,
+		TimeUsed:   timeUsed,
+		MemoryUsed: memUsed,
+		Input:      limitString(inputContent, 200), // 限制长度
+		Output:     limitString(output, 200),
+		// ExpectedOut 暂时为空，下面读取后填充
+	}
+
+	// 读取预期输出 (用于对比和返回)
+	expectedContent, readErr := getFileContentOrString(tc.ExpectedOut)
+	if readErr != nil {
+		caseRes.Status = model.StatusSystemError
+		caseRes.Message = fmt.Sprintf("failed to read expected output: %v", readErr)
+		return caseRes
+	}
+	caseRes.ExpectedOut = limitString(expectedContent, 200)
+
 	if err != nil {
-		return model.CaseResult{
-			CaseID:   tc.ID,
-			Status:   status,
-			TimeUsed: timeUsed,
-			Message:  err.Error(),
+		caseRes.Message = err.Error()
+		if status == model.StatusRuntimeError {
+			// 如果是 RE，附带 stderr
+			caseRes.Message = fmt.Sprintf("Runtime Error: %s\nStderr: %s", err.Error(), limitString(stderr, 500))
 		}
+		return caseRes
 	}
 
 	if status != model.StatusAccepted {
-		return model.CaseResult{
-			CaseID:     tc.ID,
-			Status:     status,
-			TimeUsed:   timeUsed,
-			MemoryUsed: memUsed,
+		caseRes.Status = status
+		// 如果是 OLE/MLE 等，Message 可能为空，或者需要补充信息
+		if status == model.StatusOutputLimitExceeded {
+			caseRes.Message = "Output Limit Exceeded"
+		} else if status == model.StatusMemoryLimitExceeded {
+			caseRes.Message = "Memory Limit Exceeded"
 		}
+		return caseRes
 	}
 
 	// 比较输出
-	expectedContent, err := getFileContentOrString(tc.ExpectedOut)
-	if err != nil {
-		return model.CaseResult{
-			CaseID:  tc.ID,
-			Status:  model.StatusSystemError,
-			Message: fmt.Sprintf("failed to read expected output: %v", err),
-		}
-	}
-
 	if compareOutput(output, expectedContent) {
-		return model.CaseResult{
-			CaseID:     tc.ID,
-			Status:     model.StatusAccepted,
-			TimeUsed:   timeUsed,
-			MemoryUsed: memUsed,
-			Message:    "OK",
-		}
+		caseRes.Status = model.StatusAccepted
+		caseRes.Message = "OK"
+		return caseRes
 	} else if isPresentationError(output, expectedContent) {
-		return model.CaseResult{
-			CaseID:     tc.ID,
-			Status:     model.StatusPresentationError,
-			TimeUsed:   timeUsed,
-			MemoryUsed: memUsed,
-			Message:    "Format mismatch",
-		}
+		caseRes.Status = model.StatusPresentationError
+		caseRes.Message = "Format mismatch"
+		return caseRes
 	} else {
-		return model.CaseResult{
-			CaseID:     tc.ID,
-			Status:     model.StatusWrongAnswer,
-			TimeUsed:   timeUsed,
-			MemoryUsed: memUsed,
-			Message:    fmt.Sprintf("Expected: %s, Got: %s", limitString(expectedContent, 50), limitString(output, 50)),
-		}
+		caseRes.Status = model.StatusWrongAnswer
+		// 生成简短 Diff
+		caseRes.Message = generateDiff(expectedContent, output)
+		return caseRes
 	}
+}
+
+// generateDiff 生成简短的对比信息
+func generateDiff(expected, actual string) string {
+	// 简单截取前 50 个字符展示
+	expLimit := limitString(expected, 50)
+	actLimit := limitString(actual, 50)
+	return fmt.Sprintf("Expected: %q, Got: %q", expLimit, actLimit)
 }
 
 // getFileContentOrString 判断是文件路径还是内容，如果是文件则读取

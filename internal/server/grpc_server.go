@@ -62,16 +62,20 @@ func (s *JudgeServer) Judge(ctx context.Context, req *pb.JudgeRequest) (*pb.Judg
 		Message:    result.Message,
 		TimeUsed:   result.TimeUsed,
 		MemoryUsed: result.MemoryUsed,
+		CompileLog: result.CompileLog,
 		CaseResults: make([]*pb.CaseResult, len(result.CaseResults)),
 	}
 
 	for i, cr := range result.CaseResults {
 		resp.CaseResults[i] = &pb.CaseResult{
-			CaseId:     cr.CaseID,
-			Status:     string(cr.Status),
-			TimeUsed:   cr.TimeUsed,
-			MemoryUsed: cr.MemoryUsed,
-			Message:    cr.Message,
+			CaseId:         cr.CaseID,
+			Status:         string(cr.Status),
+			TimeUsed:       cr.TimeUsed,
+			MemoryUsed:     cr.MemoryUsed,
+			Message:        cr.Message,
+			Input:          cr.Input,
+			Output:         cr.Output,
+			ExpectedOutput: cr.ExpectedOut,
 		}
 	}
 

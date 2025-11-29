@@ -11,7 +11,7 @@ import (
 )
 
 type Compiler interface {
-	Compile(sourceCode, workDir string) (string, error)
+	Compile(sourceCode, workDir string) (string, string, error)
 }
 
 type CPPCompiler struct{}
@@ -20,12 +20,12 @@ func NewCPPCompiler() *CPPCompiler {
 	return &CPPCompiler{}
 }
 
-func (c *CPPCompiler) Compile(sourceCode, workDir string) (string, error) {
+func (c *CPPCompiler) Compile(sourceCode, workDir string) (string, string, error) {
 	srcPath := filepath.Join(workDir, "main.cpp")
 	exePath := filepath.Join(workDir, "main")
 
 	if err := os.WriteFile(srcPath, []byte(sourceCode), 0644); err != nil {
-		return "", fmt.Errorf("failed to write source code: %v", err)
+		return "", "", fmt.Errorf("failed to write source code: %v", err)
 	}
 
 	// g++ main.cpp -o main -O2 -Wall -std=c++17
@@ -34,10 +34,10 @@ func (c *CPPCompiler) Compile(sourceCode, workDir string) (string, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("compilation failed: %s", stderr.String())
+		return "", stderr.String(), fmt.Errorf("compilation failed")
 	}
 
-	return exePath, nil
+	return exePath, stderr.String(), nil
 }
 
 func GetCompiler(lang model.Language) (Compiler, error) {
