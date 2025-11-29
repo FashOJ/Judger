@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -18,6 +19,7 @@ type Registry struct {
 	addr        string
 	logger      *zap.Logger
 	stopChan    chan struct{}
+	once        sync.Once
 }
 
 type InstanceInfo struct {
@@ -52,10 +54,12 @@ func (r *Registry) Start() {
 }
 
 func (r *Registry) Stop() {
-	close(r.stopChan)
-	// 删除注册信息
-	key := fmt.Sprintf("judger:instances:%s", r.instanceID)
-	r.client.Del(context.Background(), key)
+	r.once.Do(func() {
+		close(r.stopChan)
+		// 删除注册信息
+		key := fmt.Sprintf("judger:instances:%s", r.instanceID)
+		r.client.Del(context.Background(), key)
+	})
 }
 
 func (r *Registry) heartbeat() {
