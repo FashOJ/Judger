@@ -8,8 +8,11 @@ const (
 	StatusWrongAnswer         JudgeStatus = "Wrong Answer"
 	StatusTimeLimitExceeded   JudgeStatus = "Time Limit Exceeded"
 	StatusMemoryLimitExceeded JudgeStatus = "Memory Limit Exceeded"
+	StatusOutputLimitExceeded JudgeStatus = "Output Limit Exceeded"
+	StatusPresentationError   JudgeStatus = "Presentation Error"
 	StatusRuntimeError        JudgeStatus = "Runtime Error"
 	StatusSystemError         JudgeStatus = "System Error"
+	StatusUnknownError        JudgeStatus = "Unknown Error"
 	StatusCompileError        JudgeStatus = "Compile Error"
 	StatusPending             JudgeStatus = "Pending"
 )
@@ -18,21 +21,21 @@ const (
 type Language string
 
 const (
-	LangCPP Language = "cpp"
-	LangGo  Language = "go"
-	LangJava Language = "java"
+	LangCPP    Language = "cpp"
+	LangGo     Language = "go"
+	LangJava   Language = "java"
 	LangPython Language = "python"
 )
 
 // JudgeTask 判题任务
 type JudgeTask struct {
-	ID           string
-	SourceCode   string
-	Language     Language
-	TimeLimit    int64 // ms
-	MemoryLimit  int64 // MB
-	TestCases    []TestCase
-	WorkDir      string
+	ID          string
+	SourceCode  string
+	Language    Language
+	TimeLimit   int64 // ms
+	MemoryLimit int64 // MB
+	TestCases   []TestCase
+	WorkDir     string
 }
 
 // TestCase 测试用例
@@ -44,10 +47,10 @@ type TestCase struct {
 
 // JudgeResult 单次判题结果
 type JudgeResult struct {
-	Status    JudgeStatus
-	Message   string
-	TimeUsed  int64 // ms
-	MemoryUsed int64 // KB
+	Status      JudgeStatus
+	Message     string
+	TimeUsed    int64 // ms
+	MemoryUsed  int64 // KB
 	CaseResults []CaseResult
 }
 

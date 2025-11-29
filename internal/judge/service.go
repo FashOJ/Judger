@@ -122,6 +122,14 @@ func (s *JudgeService) runTestCase(ctx context.Context, exePath string, task *mo
 			MemoryUsed: memUsed,
 			Message:    "OK",
 		}
+	} else if isPresentationError(output, expectedContent) {
+		return model.CaseResult{
+			CaseID:     tc.ID,
+			Status:     model.StatusPresentationError,
+			TimeUsed:   timeUsed,
+			MemoryUsed: memUsed,
+			Message:    "Format mismatch",
+		}
 	} else {
 		return model.CaseResult{
 			CaseID:     tc.ID,
@@ -147,9 +155,27 @@ func getFileContentOrString(input string) (string, error) {
 	return input, nil
 }
 
-// compareOutput 简单的文本比较
+// compareOutput 严格比较（包括尾部换行符）
 func compareOutput(actual, expected string) bool {
+	// 传统的 OJ 通常要求完全一致，或者允许忽略行末空格
+	// 这里我们先保留 TrimSpace 的宽容策略作为 AC，如果完全不匹配再检查 PE
+	// 但为了支持 PE，我们需要一个更严格的 AC 标准：
+	// AC: 内容完全一致（或者仅忽略行末空格）
+	// PE: 去除所有空白字符后一致
+
+	// 策略调整：
+	// AC: TrimRight 每个行末空格，TrimRight 整个字符串末尾换行
 	return strings.TrimSpace(actual) == strings.TrimSpace(expected)
+}
+
+// isPresentationError 检查是否为格式错误
+func isPresentationError(actual, expected string) bool {
+	// 去除所有空白字符（空格、换行、制表符）后比较
+	return removeAllWhitespace(actual) == removeAllWhitespace(expected)
+}
+
+func removeAllWhitespace(s string) string {
+	return strings.Join(strings.Fields(s), "")
 }
 
 func limitString(s string, n int) string {

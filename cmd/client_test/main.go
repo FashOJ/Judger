@@ -19,25 +19,69 @@ func main() {
 	defer conn.Close()
 	c := pb.NewJudgeServiceClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// 1. Test AC
+	test(ctx, c, "AC Test", 
+		"#include <iostream>\nint main() { int a, b; std::cin >> a >> b; std::cout << a + b; return 0; }",
+		"1 2", "3")
+
+	// 2. Test WA
+	test(ctx, c, "WA Test", 
+		"#include <iostream>\nint main() { int a, b; std::cin >> a >> b; std::cout << a + b + 1; return 0; }",
+		"1 2", "3")
+	
+	// 3. Test PE (Output: "3 " vs Expected: "3") - Note: Our current AC logic is loose (TrimSpace), so this might AC
+	// Let's try something that is definitely PE in strict mode but we need to ensure our PE logic works.
+	// Current logic: AC = TrimSpace equal. PE = RemoveAllWhitespace equal.
+	// So "3 " vs "3" is AC.
+	// Let's try "3\n" vs "3" -> AC.
+	// Let's try "1 2" vs "1\n2".
+	// TrimSpace("1 2") != TrimSpace("1\n2"). RemoveAllWhitespace("1 2") == "12" == RemoveAllWhitespace("1\n2"). -> PE
+	test(ctx, c, "PE Test", 
+		"#include <iostream>\nint main() { std::cout << \"1 2\"; return 0; }",
+		"", "1\n2")
+
+	// 4. Test OLE
+	test(ctx, c, "OLE Test", 
+		"#include <iostream>\nint main() { while(1) std::cout << \"output limit exceeded...\"; return 0; }",
+		"", "expected")
+
+	// 5. Test MLE
+	test(ctx, c, "MLE Test", 
+		"#include <iostream>\n#include <vector>\nint main() { std::vector<int> v; while(1) v.push_back(1); return 0; }",
+		"", "expected")
+	
+	// 6. Test RE (Div by zero)
+	test(ctx, c, "RE Test", 
+		"#include <iostream>\nint main() { int a = 0; std::cout << 1/a; return 0; }",
+		"", "expected")
+}
+
+func test(ctx context.Context, c pb.JudgeServiceClient, name, code, input, expected string) {
+	fmt.Printf("Running %s...\n", name)
 	r, err := c.Judge(ctx, &pb.JudgeRequest{
-		Id:          "test-001",
-		SourceCode:  "#include <iostream>\nint main() { int a, b; std::cin >> a >> b; std::cout << a + b; return 0; }",
+		Id:          "test-" + name,
+		SourceCode:  code,
 		Language:    "cpp",
 		TimeLimit:   1000,
-		MemoryLimit: 256,
+		MemoryLimit: 128, // 128MB
 		TestCases: []*pb.TestCase{
 			{
 				Id:             "case-1",
-				Input:          "1 2",
-				ExpectedOutput: "3",
+				Input:          input,
+				ExpectedOutput: expected,
 			},
 		},
 	})
 	if err != nil {
-		log.Fatalf("could not judge: %v", err)
+		log.Printf("RPC failed: %v\n", err)
+		return
 	}
-	fmt.Printf("Status: %s, Time: %dms, Memory: %dKB\n", r.Status, r.TimeUsed, r.MemoryUsed)
+	fmt.Printf("[%s] Status: %s, Message: %s\n", name, r.Status, r.Message)
+	if len(r.CaseResults) > 0 {
+		fmt.Printf("Case Status: %s\n", r.CaseResults[0].Status)
+	}
+	fmt.Println("--------------------------------------------------")
 }

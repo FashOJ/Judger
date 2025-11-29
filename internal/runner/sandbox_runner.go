@@ -4,11 +4,18 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/FashOJ/Judger/internal/model"
 	"github.com/FashOJ/Judger/internal/sandbox"
+)
+
+const (
+	// MaxOutputSize 最大输出限制 (16MB)
+	MaxOutputSize = 16 * 1024 * 1024
 )
 
 type SandboxRunner struct {
@@ -36,15 +43,14 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	cgName := fmt.Sprintf("%s_%d", r.CgroupRoot, time.Now().UnixNano())
 	cgroup, err := sandbox.NewCgroupManager(cgName)
 	if err != nil {
-		// 如果创建 cgroup 失败（可能是权限不足），降级处理或报错
-		// 这里为了演示，如果失败则记录日志并返回系统错误
 		return "", model.StatusSystemError, 0, 0, fmt.Errorf("create cgroup failed: %v (try running as root)", err)
 	}
 	defer cgroup.Destroy()
 
 	// 设置资源限制 (内存 + 10% buffer, CPU 100%)
 	memLimitBytes := (memoryLimit * 1024 * 1024)
-	_ = cgroup.SetMemoryLimit(memLimitBytes)
+	// 给一点 buffer 防止瞬间 OOM，实际判断以 usage 为准，或者依靠 OOM Kill
+	_ = cgroup.SetMemoryLimit(memLimitBytes + 1024*1024)
 	_ = cgroup.SetCPULimit(100)
 
 	// 3. 准备沙箱命令
@@ -78,37 +84,75 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	timeoutDuration := time.Duration(timeLimit) * time.Millisecond
 	select {
 	case <-ctx.Done():
-		// 上下文取消
 		_ = cmd.Process.Kill()
 		status = model.StatusSystemError
 	case <-time.After(timeoutDuration):
-		// 超时
 		_ = cmd.Process.Kill()
 		status = model.StatusTimeLimitExceeded
 		timeUsed = timeLimit
 	case err := <-done:
-		// 正常结束或运行时错误
 		timeUsed = time.Since(startTime).Milliseconds()
+
 		if err != nil {
-			status = model.StatusRuntimeError
+			// 检查退出码和信号
+			if exitError, ok := err.(*exec.ExitError); ok {
+				ws := exitError.Sys().(syscall.WaitStatus)
+
+				// 1. 检查是否被信号杀死
+				if ws.Signaled() {
+					sig := ws.Signal()
+					switch sig {
+					case syscall.SIGKILL:
+						// 可能是 OOM，也可能是 TLE (但在 time.After 分支处理 TLE)
+						// 结合内存使用判断 MLE
+						status = model.StatusRuntimeError // 暂定，下面会修正
+					case syscall.SIGXFSZ:
+						status = model.StatusOutputLimitExceeded
+					case syscall.SIGSEGV:
+						status = model.StatusRuntimeError // Segmentation Fault
+					default:
+						status = model.StatusRuntimeError
+					}
+				} else {
+					// 非 0 退出码
+					status = model.StatusRuntimeError
+				}
+			} else {
+				status = model.StatusRuntimeError
+			}
 		}
 	}
 
 	// 获取内存使用 (从 cgroup)
-	// 注意：进程结束后可能无法获取 current，最好有一个监控协程，或者取 max_usage
-	// 这里简单尝试读取
 	if mem, err := cgroup.GetMemoryUsage(); err == nil {
 		memoryUsed = mem / 1024 // Convert to KB
 	}
 
-	// 检查内存超限 (Cgroup OOM 会导致进程被 Kill)
-	if memoryUsed > memoryLimit*1024 { // memoryLimit is MB, memoryUsed is KB
+	// 检查 OLE (Output Limit Exceeded)
+	if stat, err := os.Stat(outputFile); err == nil {
+		if stat.Size() > MaxOutputSize {
+			status = model.StatusOutputLimitExceeded
+		}
+	}
+
+	// 检查 MLE (Memory Limit Exceeded)
+	// 如果内存使用超过限制，或者因为 SIGKILL 退出且内存很高
+	if memoryUsed > memoryLimit*1024 {
 		status = model.StatusMemoryLimitExceeded
+	} else if status == model.StatusRuntimeError {
+		// 如果是被 KILL 且接近内存限制，大概率是 OOM
+		// 这是一个启发式判断，不完全准确
+		if memoryUsed > int64(float64(memoryLimit*1024)*0.9) {
+			status = model.StatusMemoryLimitExceeded
+		}
 	}
 
 	// 读取输出
 	outputBytes, _ := os.ReadFile(outputFile)
-	
+	if len(outputBytes) > MaxOutputSize {
+		outputBytes = outputBytes[:MaxOutputSize]
+	}
+
 	// 清理临时文件
 	_ = os.Remove(inputFile)
 	_ = os.Remove(outputFile)
