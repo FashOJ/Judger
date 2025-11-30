@@ -8,7 +8,6 @@ const (
 	StatusWrongAnswer         JudgeStatus = "Wrong Answer"
 	StatusTimeLimitExceeded   JudgeStatus = "Time Limit Exceeded"
 	StatusMemoryLimitExceeded JudgeStatus = "Memory Limit Exceeded"
-	StatusOutputLimitExceeded JudgeStatus = "Output Limit Exceeded"
 	StatusPresentationError   JudgeStatus = "Presentation Error"
 	StatusRuntimeError        JudgeStatus = "Runtime Error"
 	StatusSystemError         JudgeStatus = "System Error"

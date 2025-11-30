@@ -121,8 +121,6 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 					// 可能是 OOM，也可能是 TLE (但在 time.After 分支处理 TLE)
 					// 结合内存使用判断 MLE
 					status = model.StatusRuntimeError // 暂定，下面会修正
-				case syscall.SIGXFSZ:
-					status = model.StatusOutputLimitExceeded
 				case syscall.SIGSEGV:
 					status = model.StatusRuntimeError // Segmentation Fault
 				default:
@@ -140,13 +138,6 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	// 获取内存使用 (从 cgroup)
 	if mem, err := cgroup.GetMemoryUsage(); err == nil {
 		memoryUsed = mem / 1024 // Convert to KB
-	}
-
-	// 检查 OLE (Output Limit Exceeded)
-	if stat, err := os.Stat(outputFile); err == nil {
-		if stat.Size() > MaxOutputSize {
-			status = model.StatusOutputLimitExceeded
-		}
 	}
 
 	// 检查 MLE (Memory Limit Exceeded)

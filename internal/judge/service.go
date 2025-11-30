@@ -120,9 +120,7 @@ func (s *JudgeService) runTestCase(ctx context.Context, exePath string, task *mo
 	if status != model.StatusAccepted {
 		caseRes.Status = status
 		// 如果是 OLE/MLE 等，Message 可能为空，或者需要补充信息
-		if status == model.StatusOutputLimitExceeded {
-			caseRes.Message = "Output Limit Exceeded"
-		} else if status == model.StatusMemoryLimitExceeded {
+		if status == model.StatusMemoryLimitExceeded {
 			caseRes.Message = "Memory Limit Exceeded"
 		}
 		return caseRes
