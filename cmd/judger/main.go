@@ -19,6 +19,8 @@ func main() {
 	// 命令行参数
 	port := flag.Int("port", 50051, "The server port")
 	redisAddr := flag.String("redis", "localhost:6379", "Redis address for service discovery")
+	workers := flag.Int("workers", 4, "Number of worker goroutines")
+	queueSize := flag.Int("queue-size", 100, "Size of the job queue")
 	flag.Parse()
 
 	// 初始化 Logger
@@ -35,7 +37,7 @@ func main() {
 
 	// 创建 gRPC 服务器
 	s := grpc.NewServer()
-	judgeServer := server.NewJudgeServer(logger)
+	judgeServer := server.NewJudgeServer(*workers, *queueSize, logger)
 	pb.RegisterJudgeServiceServer(s, judgeServer)
 
 	// 服务注册与发现

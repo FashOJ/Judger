@@ -12,18 +12,56 @@ import (
 )
 
 type JudgeService struct {
-	runner runner.Runner
+	runner   runner.Runner
+	jobQueue chan *model.JudgeTask
 }
 
-func NewJudgeService() *JudgeService {
-	// 优先尝试使用 SandboxRunner，这通常需要 root 权限
-	// 实际生产中可以通过配置决定
-	return &JudgeService{
-		runner: runner.NewSandboxRunner(),
+func NewJudgeService(workers int, queueSize int) *JudgeService {
+	s := &JudgeService{
+		runner:   runner.NewSandboxRunner(),
+		jobQueue: make(chan *model.JudgeTask, queueSize),
+	}
+	s.startWorkers(workers)
+	return s
+}
+
+func (s *JudgeService) startWorkers(n int) {
+	for i := 0; i < n; i++ {
+		go s.worker()
 	}
 }
 
-func (s *JudgeService) Judge(ctx context.Context, task *model.JudgeTask) *model.JudgeResult {
+func (s *JudgeService) worker() {
+	for task := range s.jobQueue {
+		// 执行判题逻辑
+		// 注意：这里的 ctx 暂时使用 Background，或者可以从 task 中传递（如果需要支持取消）
+		// 实际生产中，Task 应该包含 Context
+		ctx := context.Background()
+		result := s.judgeCore(ctx, task)
+
+		// 将结果发送回 ResultChan
+		// 使用非阻塞发送防止死锁（虽然理论上接收方在等待）
+		select {
+		case task.ResultChan <- result:
+		default:
+			// Log error: result channel blocked or closed
+			fmt.Printf("Error: ResultChan blocked for task %s\n", task.ID)
+		}
+	}
+}
+
+// Submit 提交任务
+func (s *JudgeService) Submit(task *model.JudgeTask) error {
+	select {
+	case s.jobQueue <- task:
+		return nil
+	default:
+		return fmt.Errorf("system busy: job queue is full")
+	}
+}
+
+// judgeCore 核心判题逻辑 (原 Judge 方法)
+func (s *JudgeService) judgeCore(ctx context.Context, task *model.JudgeTask) *model.JudgeResult {
 	result := &model.JudgeResult{
 		Status:      model.StatusAccepted,
 		CaseResults: make([]model.CaseResult, 0),

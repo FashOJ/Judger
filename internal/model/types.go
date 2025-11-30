@@ -35,6 +35,7 @@ type JudgeTask struct {
 	MemoryLimit int64 // MB
 	TestCases   []TestCase
 	WorkDir     string
+	ResultChan  chan *JudgeResult `json:"-"` // 用于异步回传结果
 }
 
 // TestCase 测试用例
