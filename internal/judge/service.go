@@ -9,17 +9,28 @@ import (
 	"github.com/FashOJ/Judger/internal/compiler"
 	"github.com/FashOJ/Judger/internal/model"
 	"github.com/FashOJ/Judger/internal/runner"
+	"github.com/FashOJ/Judger/internal/sandbox"
 )
 
 type JudgeService struct {
-	runner   runner.Runner
-	jobQueue chan *model.JudgeTask
+	runner     runner.Runner
+	jobQueue   chan *model.JudgeTask
+	cgroupPool *sandbox.CgroupPool
 }
 
 func NewJudgeService(workers int, queueSize int) *JudgeService {
+	// 初始化 CgroupPool
+	// 池大小等于 Worker 数量，因为每个 Worker 同一时间只处理一个任务
+	pool, err := sandbox.NewCgroupPool(workers, "fashoj_pool")
+	if err != nil {
+		// 这里 panic 是合理的，因为如果资源池初始化失败，服务无法运行
+		panic(fmt.Sprintf("failed to init cgroup pool: %v", err))
+	}
+
 	s := &JudgeService{
-		runner:   runner.NewSandboxRunner(),
-		jobQueue: make(chan *model.JudgeTask, queueSize),
+		cgroupPool: pool,
+		runner:     runner.NewSandboxRunner(pool),
+		jobQueue:   make(chan *model.JudgeTask, queueSize),
 	}
 	s.startWorkers(workers)
 	return s

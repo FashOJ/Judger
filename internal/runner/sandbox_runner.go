@@ -19,12 +19,12 @@ const (
 )
 
 type SandboxRunner struct {
-	CgroupRoot string
+	CgroupPool *sandbox.CgroupPool
 }
 
-func NewSandboxRunner() *SandboxRunner {
+func NewSandboxRunner(cgroupPool *sandbox.CgroupPool) *SandboxRunner {
 	return &SandboxRunner{
-		CgroupRoot: "fashoj_judger",
+		CgroupPool: cgroupPool,
 	}
 }
 
@@ -39,13 +39,9 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("write input failed: %v", err)
 	}
 
-	// 2. 创建 Cgroup
-	cgName := fmt.Sprintf("%s_%d", r.CgroupRoot, time.Now().UnixNano())
-	cgroup, err := sandbox.NewCgroupManager(cgName)
-	if err != nil {
-		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("create cgroup failed: %v (try running as root)", err)
-	}
-	defer cgroup.Destroy()
+	// 2. 获取 Cgroup (从池中)
+	cgroup := r.CgroupPool.Acquire()
+	defer r.CgroupPool.Release(cgroup)
 
 	// 设置资源限制 (内存 + 10% buffer, CPU 100%)
 	memLimitBytes := (memoryLimit * 1024 * 1024)

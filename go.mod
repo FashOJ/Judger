@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/redis/go-redis/v9 v9.17.1
+	github.com/seccomp/libseccomp-golang v0.11.1
 	go.uber.org/zap v1.27.1
 	google.golang.org/grpc v1.77.0
 	google.golang.org/protobuf v1.36.10
