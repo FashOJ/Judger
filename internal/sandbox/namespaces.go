@@ -14,11 +14,15 @@ import (
 func RunInSandbox(cmdPath string, args []string, rootFS string, inputPath, outputPath, errorPath string) (*exec.Cmd, error) {
 	// 获取 nobody 用户
 	u, err := user.Lookup("nobody")
+	var uid, gid int
 	if err != nil {
-		return nil, fmt.Errorf("failed to lookup user 'nobody': %v", err)
+		// Fallback to 65534 if 'nobody' is not found
+		uid = 65534
+		gid = 65534
+	} else {
+		uid, _ = strconv.Atoi(u.Uid)
+		gid, _ = strconv.Atoi(u.Gid)
 	}
-	uid, _ := strconv.Atoi(u.Uid)
-	gid, _ := strconv.Atoi(u.Gid)
 
 	// 加载 Seccomp 规则
 	// 注意：在 Go 中直接加载 Seccomp 会影响当前线程，而 Go 的调度机制导致线程不确定。
