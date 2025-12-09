@@ -53,6 +53,11 @@ func RunInSandbox(cmdPath string, args []string, rootFS string, inputPath, outpu
 			syscall.CLONE_NEWNET | // 网络隔离 (无网络)
 			syscall.CLONE_NEWIPC, // IPC 隔离
 		// 不使用 CLONE_NEWUSER，因为它会导致文件权限问题，除非做 uid mapping
+		// 但是为了低权限运行，我们需要切换 UID/GID
+		Credential: &syscall.Credential{
+			Uid: 65534, // nobody
+			Gid: 65534, // nogroup
+		},
 	}
 
 	// 设置 Chroot (如果提供了 rootFS)

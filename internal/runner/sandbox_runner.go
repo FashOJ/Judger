@@ -38,6 +38,29 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	if err := os.WriteFile(inputFile, []byte(input), 0644); err != nil {
 		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("write input failed: %v", err)
 	}
+	
+	// 确保临时文件权限允许 nobody 用户读取/写入
+	// input: 644 (owner write, others read) -> nobody (others) can read. OK.
+	// output/error: will be created by nobody?
+	// No, they are created by parent (root) via os.Create?
+	// Wait, os.Create in namespaces.go happens BEFORE switching user.
+	// If parent creates them, they are owned by root.
+	// We need to ensure nobody can write to them.
+	// Change mode to 0666 or chown.
+	_ = os.Chmod(inputFile, 0666)
+	_ = os.Chmod(outputFile, 0666) // Pre-create if needed or rely on sandbox logic
+	_ = os.Chmod(errorFile, 0666)
+	
+	// Better: Pre-create output/error files and chmod them
+	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+		os.WriteFile(outputFile, []byte(""), 0666)
+	}
+	_ = os.Chmod(outputFile, 0666)
+	
+	if _, err := os.Stat(errorFile); os.IsNotExist(err) {
+		os.WriteFile(errorFile, []byte(""), 0666)
+	}
+	_ = os.Chmod(errorFile, 0666)
 
 	// 2. 获取 Cgroup (从池中)
 	cgroup := r.CgroupPool.Acquire()
