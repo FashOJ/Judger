@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"strconv"
 	"syscall"
+	"unsafe"
 )
 
 // RunInSandbox 在隔离环境中运行命令
@@ -117,4 +118,35 @@ func RunInSandbox(cmdPath string, args []string, rootFS string, inputPath, outpu
 	cmd.Env = []string{"PATH=/bin:/usr/bin", "HOME=/"}
 
 	return cmd, nil
+}
+
+// SetOutputLimit 使用 prlimit 设置文件大小限制 (需要在 Start 之后调用)
+func SetOutputLimit(pid int, limitBytes int64) error {
+	var rlimit syscall.Rlimit
+	rlimit.Cur = uint64(limitBytes)
+	rlimit.Max = uint64(limitBytes)
+
+	// SYS_PRLIMIT64 = 302 (on amd64)
+	// prlimit(pid, resource, new_limit, old_limit)
+	_, _, errno := syscall.RawSyscall6(syscall.SYS_PRLIMIT64, uintptr(pid), uintptr(syscall.RLIMIT_FSIZE), uintptr(unsafe.Pointer(&rlimit)), 0, 0, 0)
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
+
+// SetStackLimit 使用 prlimit 设置栈空间限制 (需要在 Start 之后调用)
+func SetStackLimit(pid int, limitBytes int64) error {
+	var rlimit syscall.Rlimit
+	rlimit.Cur = uint64(limitBytes)
+	rlimit.Max = uint64(limitBytes)
+
+	// SYS_PRLIMIT64 = 302 (on amd64)
+	// prlimit(pid, resource, new_limit, old_limit)
+	// RLIMIT_STACK = 3
+	_, _, errno := syscall.RawSyscall6(syscall.SYS_PRLIMIT64, uintptr(pid), uintptr(syscall.RLIMIT_STACK), uintptr(unsafe.Pointer(&rlimit)), 0, 0, 0)
+	if errno != 0 {
+		return errno
+	}
+	return nil
 }

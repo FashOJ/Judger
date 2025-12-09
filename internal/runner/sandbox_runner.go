@@ -38,7 +38,7 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	if err := os.WriteFile(inputFile, []byte(input), 0644); err != nil {
 		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("write input failed: %v", err)
 	}
-	
+
 	// 确保临时文件权限允许 nobody 用户读取/写入
 	// input: 644 (owner write, others read) -> nobody (others) can read. OK.
 	// output/error: will be created by nobody?
@@ -50,13 +50,13 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	_ = os.Chmod(inputFile, 0666)
 	_ = os.Chmod(outputFile, 0666) // Pre-create if needed or rely on sandbox logic
 	_ = os.Chmod(errorFile, 0666)
-	
+
 	// Better: Pre-create output/error files and chmod them
 	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
 		os.WriteFile(outputFile, []byte(""), 0666)
 	}
 	_ = os.Chmod(outputFile, 0666)
-	
+
 	if _, err := os.Stat(errorFile); os.IsNotExist(err) {
 		os.WriteFile(errorFile, []byte(""), 0666)
 	}
@@ -83,6 +83,17 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	if err := cmd.Start(); err != nil {
 		return "", "", model.StatusRuntimeError, 0, 0, fmt.Errorf("start process failed: %v", err)
 	}
+
+	// 尝试设置文件大小限制 (OLE)
+	// 即使设置失败也不影响运行，只是 OLE 可能会变成 MLE
+	// MaxOutputSize = 16MB
+	_ = sandbox.SetOutputLimit(cmd.Process.Pid, MaxOutputSize)
+
+	// 设置栈空间限制 (RLIMIT_STACK)
+	// 默认设置为内存限制的大小，或者给一个较大的固定值 (如 128MB)
+	// C++ 程序经常需要较大栈空间
+	stackLimitBytes := memLimitBytes
+	_ = sandbox.SetStackLimit(cmd.Process.Pid, stackLimitBytes)
 
 	// 将进程加入 Cgroup
 	if err := cgroup.AddProcess(cmd.Process.Pid); err != nil {
