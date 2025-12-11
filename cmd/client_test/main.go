@@ -23,15 +23,15 @@ func main() {
 	defer cancel()
 
 	// 1. Test AC
-	test(ctx, c, "AC Test", 
+	test(ctx, c, "AC Test",
 		"#include <iostream>\nint main() { int a, b; std::cin >> a >> b; std::cout << a + b; return 0; }",
 		"1 2", "3")
 
 	// 2. Test WA
-	test(ctx, c, "WA Test", 
+	test(ctx, c, "WA Test",
 		"#include <iostream>\nint main() { int a, b; std::cin >> a >> b; std::cout << a + b + 1; return 0; }",
 		"1 2", "3")
-	
+
 	// 3. Test PE (Output: "3 " vs Expected: "3") - Note: Our current AC logic is loose (TrimSpace), so this might AC
 	// Let's try something that is definitely PE in strict mode but we need to ensure our PE logic works.
 	// Current logic: AC = TrimSpace equal. PE = RemoveAllWhitespace equal.
@@ -39,22 +39,22 @@ func main() {
 	// Let's try "3\n" vs "3" -> AC.
 	// Let's try "1 2" vs "1\n2".
 	// TrimSpace("1 2") != TrimSpace("1\n2"). RemoveAllWhitespace("1 2") == "12" == RemoveAllWhitespace("1\n2"). -> PE
-	test(ctx, c, "PE Test", 
+	test(ctx, c, "PE Test",
 		"#include <iostream>\nint main() { std::cout << \"1 2\"; return 0; }",
 		"", "1\n2")
 
 	// 4. Test OLE (Now should be TLE or MLE)
-	test(ctx, c, "OLE Test", 
+	test(ctx, c, "OLE Test",
 		"#include <iostream>\nint main() { while(1) std::cout << \"output limit exceeded...\"; return 0; }",
 		"", "expected")
 
 	// 5. Test MLE
-	test(ctx, c, "MLE Test", 
+	test(ctx, c, "MLE Test",
 		"#include <iostream>\n#include <vector>\nint main() { std::vector<int> v; while(1) v.push_back(1); return 0; }",
 		"", "expected")
-	
+
 	// 6. Test RE (Div by zero)
-	test(ctx, c, "RE Test", 
+	test(ctx, c, "RE Test",
 		"#include <iostream>\nint main() { int a = 0; std::cout << 1/a; return 0; }",
 		"", "expected")
 
@@ -71,12 +71,21 @@ func test(ctx context.Context, c pb.JudgeServiceClient, name, code, input, expec
 
 func testLang(ctx context.Context, c pb.JudgeServiceClient, name, code, lang, input, expected string) {
 	fmt.Printf("Running %s...\n", name)
+
+	// 根据语言调整默认限制
+	timeLimit := int64(1000)
+	memoryLimit := int64(128)
+	if lang == "python" {
+		timeLimit = 3000  // 3s
+		memoryLimit = 512 // 512MB
+	}
+
 	r, err := c.Judge(ctx, &pb.JudgeRequest{
 		Id:          "test-" + name,
 		SourceCode:  code,
 		Language:    lang,
-		TimeLimit:   1000,
-		MemoryLimit: 128, // 128MB
+		TimeLimit:   timeLimit,
+		MemoryLimit: memoryLimit,
 		TestCases: []*pb.TestCase{
 			{
 				Id:             "case-1",
