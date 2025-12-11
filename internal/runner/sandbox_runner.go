@@ -69,7 +69,11 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	_ = cgroup.SetCPULimit(100)
 
 	// 3. 准备沙箱命令
-	cmd, err := sandbox.RunInSandbox(exePath, []string{}, config.GlobalConfig.Sandbox.CgroupRoot, inputFile, outputFile, errorFile)
+	// 注意：config.GlobalConfig.Sandbox.CgroupRoot 只是 Cgroup 的名字，不是文件系统路径。
+	// 目前 RunInSandbox 只有在 rootFS 非空时才会检查路径存在。
+	// 为了避免报错，我们暂时传空字符串，因为我们还没有构建真正的 rootfs。
+	// 如果未来要支持 chroot，需要传入真实的 rootfs 路径（例如 /var/lib/fashoj/rootfs/base）。
+	cmd, err := sandbox.RunInSandbox(exePath, []string{}, "", inputFile, outputFile, errorFile)
 	if err != nil {
 		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("prepare sandbox failed: %v", err)
 	}
