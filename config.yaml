@@ -1,0 +1,19 @@
+server:
+  port: 50052
+  workers: 4
+  queue_size: 100
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+sandbox:
+  cgroup_root: "fashoj_judger"
+  pool_size: 4
+  max_output_size: 16777216 # 16MB
+
+compilers:
+  cpp: "/usr/bin/g++"
+  python: "/root/Tools/miniconda3/envs/fash/bin/python"
+  java: "/usr/bin/javac"

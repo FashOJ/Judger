@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/FashOJ/Judger/internal/config"
 	"github.com/FashOJ/Judger/internal/model"
 )
 
@@ -20,10 +21,14 @@ type Compiler interface {
 	Compile(ctx context.Context, sourceCode, workDir string) (string, string, error)
 }
 
-type CPPCompiler struct{}
+type CPPCompiler struct {
+	CPPPath string
+}
 
 func NewCPPCompiler() *CPPCompiler {
-	return &CPPCompiler{}
+	return &CPPCompiler{
+		CPPPath: config.GlobalConfig.Compilers.CPP,
+	}
 }
 
 func (c *CPPCompiler) Compile(ctx context.Context, sourceCode, workDir string) (string, string, error) {
@@ -39,7 +44,7 @@ func (c *CPPCompiler) Compile(ctx context.Context, sourceCode, workDir string) (
 	defer cancel()
 
 	// g++ main.cpp -o main -O2 -Wall -std=c++17
-	cmd := exec.CommandContext(compileCtx, "g++", srcPath, "-o", exePath, "-O2", "-Wall", "-std=c++17")
+	cmd := exec.CommandContext(compileCtx, c.CPPPath, srcPath, "-o", exePath, "-O2", "-Wall", "-std=c++17")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
@@ -73,7 +78,7 @@ type PythonCompiler struct {
 func NewPythonCompiler() *PythonCompiler {
 	// 使用用户指定的 Python 路径
 	return &PythonCompiler{
-		PythonPath: "/root/Tools/miniconda3/envs/fash/bin/python",
+		PythonPath: config.GlobalConfig.Compilers.Python,
 	}
 }
 

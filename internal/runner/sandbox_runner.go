@@ -9,13 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/FashOJ/Judger/internal/config"
 	"github.com/FashOJ/Judger/internal/model"
 	"github.com/FashOJ/Judger/internal/sandbox"
-)
-
-const (
-	// MaxOutputSize 最大输出限制 (16MB)
-	MaxOutputSize = 16 * 1024 * 1024
 )
 
 type SandboxRunner struct {
@@ -73,7 +69,7 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 	_ = cgroup.SetCPULimit(100)
 
 	// 3. 准备沙箱命令
-	cmd, err := sandbox.RunInSandbox(exePath, []string{}, "", inputFile, outputFile, errorFile)
+	cmd, err := sandbox.RunInSandbox(exePath, []string{}, config.GlobalConfig.Sandbox.CgroupRoot, inputFile, outputFile, errorFile)
 	if err != nil {
 		return "", "", model.StatusSystemError, 0, 0, fmt.Errorf("prepare sandbox failed: %v", err)
 	}
@@ -86,8 +82,7 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 
 	// 尝试设置文件大小限制 (OLE)
 	// 即使设置失败也不影响运行，只是 OLE 可能会变成 MLE
-	// MaxOutputSize = 16MB
-	_ = sandbox.SetOutputLimit(cmd.Process.Pid, MaxOutputSize)
+	_ = sandbox.SetOutputLimit(cmd.Process.Pid, config.GlobalConfig.Sandbox.MaxOutputSize)
 
 	// 设置栈空间限制 (RLIMIT_STACK)
 	// 默认设置为内存限制的大小，或者给一个较大的固定值 (如 128MB)
@@ -184,8 +179,8 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 
 	// 读取输出
 	outputBytes, _ := os.ReadFile(outputFile)
-	if len(outputBytes) > MaxOutputSize {
-		outputBytes = outputBytes[:MaxOutputSize]
+	if int64(len(outputBytes)) > config.GlobalConfig.Sandbox.MaxOutputSize {
+		outputBytes = outputBytes[:config.GlobalConfig.Sandbox.MaxOutputSize]
 	}
 
 	// 读取 stderr
