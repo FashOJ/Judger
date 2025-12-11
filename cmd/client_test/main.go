@@ -57,14 +57,24 @@ func main() {
 	test(ctx, c, "RE Test", 
 		"#include <iostream>\nint main() { int a = 0; std::cout << 1/a; return 0; }",
 		"", "expected")
+
+	// 7. Test Python AC
+	testLang(ctx, c, "Python AC Test",
+		"a, b = map(int, input().split())\nprint(a + b)",
+		"python",
+		"1 2", "3")
 }
 
 func test(ctx context.Context, c pb.JudgeServiceClient, name, code, input, expected string) {
+	testLang(ctx, c, name, code, "cpp", input, expected)
+}
+
+func testLang(ctx context.Context, c pb.JudgeServiceClient, name, code, lang, input, expected string) {
 	fmt.Printf("Running %s...\n", name)
 	r, err := c.Judge(ctx, &pb.JudgeRequest{
 		Id:          "test-" + name,
 		SourceCode:  code,
-		Language:    "cpp",
+		Language:    lang,
 		TimeLimit:   1000,
 		MemoryLimit: 128, // 128MB
 		TestCases: []*pb.TestCase{
