@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	conn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -59,9 +59,15 @@ func main() {
 		"", "expected")
 
 	// 7. Test Python AC
-	testLang(ctx, c, "Python AC Test",
+	testLang(ctx, c, "Python_AC_Test",
 		"a, b = map(int, input().split())\nprint(a + b)",
 		"python",
+		"1 2", "3")
+
+	// 8. Test Java AC
+	testLang(ctx, c, "Java_AC_Test",
+		"import java.util.*;\npublic class Main {\n  public static void main(String[] args) {\n    Scanner sc = new Scanner(System.in);\n    int a = sc.nextInt();\n    int b = sc.nextInt();\n    System.out.print(a + b);\n  }\n}\n",
+		"java",
 		"1 2", "3")
 }
 
@@ -75,7 +81,7 @@ func testLang(ctx context.Context, c pb.JudgeServiceClient, name, code, lang, in
 	// 根据语言调整默认限制
 	timeLimit := int64(1000)
 	memoryLimit := int64(128)
-	if lang == "python" {
+	if lang == "python" || lang == "java" {
 		timeLimit = 3000  // 3s
 		memoryLimit = 512 // 512MB
 	}

@@ -31,7 +31,10 @@ func (s *JudgeServer) Judge(ctx context.Context, req *pb.JudgeRequest) (*pb.Judg
 	workDir := req.WorkDir
 	if workDir == "" {
 		workDir = fmt.Sprintf("temp/%s", req.Id)
-		_ = os.MkdirAll(workDir, 0755)
+		// 使用 0777 权限，确保 nobody 用户可以进入目录并读取文件
+		// 注意：MkdirAll 会受 umask 影响，所以可能需要显式 Chmod
+		_ = os.MkdirAll(workDir, 0777)
+		_ = os.Chmod(workDir, 0777)
 		// 注意：如果是异步处理，这里的 defer os.RemoveAll 会在 Submit 后立即执行，导致工作目录被删
 		// 所以不能在这里 defer，必须在 Worker 处理完后清理，或者由 Worker 清理
 		// 为了简单，我们暂且保留同步等待逻辑，所以 defer 依然有效，

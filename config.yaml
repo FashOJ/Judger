@@ -15,5 +15,5 @@ sandbox:
 
 compilers:
   cpp: "/usr/bin/g++"
-  python: "/root/Tools/miniconda3/envs/fash/bin/python"
+  python: "/usr/bin/python3"
   java: "/usr/bin/javac"
