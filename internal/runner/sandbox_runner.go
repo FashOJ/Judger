@@ -84,10 +84,6 @@ func (r *SandboxRunner) Run(ctx context.Context, exePath string, input string, t
 		return "", "", model.StatusRuntimeError, 0, 0, fmt.Errorf("start process failed: %v", err)
 	}
 
-	// 尝试设置文件大小限制 (OLE)
-	// 即使设置失败也不影响运行，只是 OLE 可能会变成 MLE
-	_ = sandbox.SetOutputLimit(cmd.Process.Pid, config.GlobalConfig.Sandbox.MaxOutputSize)
-
 	// 设置栈空间限制 (RLIMIT_STACK)
 	// 默认设置为内存限制的大小，或者给一个较大的固定值 (如 128MB)
 	// C++ 程序经常需要较大栈空间

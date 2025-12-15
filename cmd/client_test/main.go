@@ -43,8 +43,8 @@ func main() {
 		"#include <iostream>\nint main() { std::cout << \"1 2\"; return 0; }",
 		"", "1\n2")
 
-	// 4. Test OLE (Now should be TLE or MLE)
-	test(ctx, c, "OLE Test",
+	// 4. Test Large Output (should hit TLE or MLE depending on limits)
+	test(ctx, c, "LargeOutput Test",
 		"#include <iostream>\nint main() { while(1) std::cout << \"output limit exceeded...\"; return 0; }",
 		"", "expected")
 
